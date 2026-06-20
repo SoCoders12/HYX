@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRANSIT — Subway Map Archive</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+
+  :root{
+    --ink: #0b0c10;
+    --ink-2: #14151b;
+    --ink-3: #1c1e26;
+    --line: #2c2e38;
+    --paper: #f5ede1;
+    --paper-dim: #9a9690;
+    --signal: #ff4d5e;
+    --signal-dim: #c23347;
+    --brass: #e8b04b;
+    --brass-dim: #b8862f;
+    --grad-a: #ff5f9e;
+    --grad-b: #ff8a3d;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--ink);
+    color: var(--paper);
+    font-family:'Space Grotesk', sans-serif;
+    min-height:100vh;
+  }
+  ::selection{ background: var(--signal); color: var(--ink); }
+
+  /* =================== APP SHELL =================== */
+  .topbar{
+    background: var(--ink-2);
+    border-bottom:1px solid var(--line);
+    padding:16px 32px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:sticky;
+    top:0;
+    z-index:20;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:'Archivo Black', sans-serif;
+    font-size:16px;
+    letter-spacing:1px;
+  }
+  .brand-mark{
+    width:30px; height:30px;
+    background: var(--signal);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:13px;
+    color: var(--ink);
+  }
+  .top-tabs{
+    display:flex;
+    gap:0;
+    border:1px solid var(--line);
+  }
+  .tab{
+    padding:9px 22px;
+    font-size:12.5px;
+    font-weight:600;
+    font-family:'JetBrains Mono', monospace;
+    letter-spacing:.5px;
+    color: var(--paper-dim);
+    cursor:pointer;
+    border:none;
+    background:transparent;
+    text-transform:uppercase;
+  }
+  .tab + .tab{ border-left:1px solid var(--line); }
+  .tab.active{
+    background: var(--signal);
+    color: var(--ink);
+  }
+  .top-right{ display:flex; gap:10px; }
+  .icon-btn{
+    width:36px;height:36px;
+    border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    color: var(--paper-dim);
+    font-size:14px;
+    cursor:pointer;
+    background: var(--ink);
+  }
+  .icon-btn:hover{ border-color: var(--brass); color: var(--brass); }
+
+  .hero{
+    padding:64px 32px 40px;
+    max-width:1280px;
+    margin:0 auto;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:28px;
+    flex-wrap:wrap;
+    border-bottom:1px solid var(--line);
+  }
+  .hero-eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11.5px;
+    letter-spacing:2px;
+    color: var(--brass);
+    text-transform:uppercase;
+    margin-bottom:14px;
+  }
+  .hero h2{
+    font-family:'Archivo Black', sans-serif;
+    font-size:clamp(48px, 7vw, 84px);
+    line-height:.92;
+    margin:0;
+    letter-spacing:-1px;
+  }
+  .hero .count{
+    font-family:'JetBrains Mono', monospace;
+    color: var(--paper-dim);
+    font-size:12.5px;
+    margin-top:14px;
+    letter-spacing:.5px;
+  }
+  .search-box{
+    flex:0 1 380px;
+    min-width:240px;
+    background: var(--ink-2);
+    border:1px solid var(--line);
+    padding:14px 18px;
+    color: var(--paper-dim);
+    font-size:13.5px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:'JetBrains Mono', monospace;
+  }
+  .search-box input{
+    background:none;
+    border:none;
+    outline:none;
+    color:var(--paper);
+    font-size:13.5px;
+    width:100%;
+    font-family:'JetBrains Mono', monospace;
+  }
+
+  .grid{
+    max-width:1280px;
+    margin:0 auto;
+    padding: 48px 32px 80px;
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap:36px;
+  }
+
+  .card{
+    background: var(--ink-2);
+    border:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    transition: border-color .2s ease, transform .2s ease;
+  }
+  .card:hover{
+    border-color: var(--brass);
+    transform: translateY(-3px);
+  }
+
+  /* Name-only tile (replaces photo thumbnail) */
+  .name-tile{
+    position:relative;
+    aspect-ratio: 16/10;
+    overflow:hidden;
+    border-bottom:1px dashed var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: var(--tile-bg, linear-gradient(150deg, #1c1e26, #0b0c10));
+  }
+  .name-tile::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image: repeating-linear-gradient(0deg, transparent 0 23px, rgba(245,237,225,.04) 23px 24px);
+    pointer-events:none;
+  }
+  .name-tile::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background: radial-gradient(circle at 30% 20%, rgba(255,255,255,.06), transparent 55%);
+    pointer-events:none;
+  }
+  .tile-city{
+    font-family:'Archivo Black', sans-serif;
+    font-size:30px;
+    letter-spacing:-.5px;
+    color: var(--paper);
+    text-transform:uppercase;
+    text-align:center;
+    line-height:1.05;
+    padding:0 16px;
+    position:relative;
+    z-index:1;
+  }
+  .tile-code{
+    position:absolute;
+    bottom:10px; right:12px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:10.5px;
+    color: var(--paper-dim);
+    letter-spacing:1px;
+    z-index:2;
+  }
+  .badge-row{
+    position:absolute;
+    top:10px;left:10px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    z-index:2;
+  }
+  .badge{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:.5px;
+    padding:4px 9px;
+    color: var(--ink);
+    width: fit-content;
+    text-transform:uppercase;
+  }
+  .badge.new{ background: var(--signal); color:#fff; }
+  .badge.orig{ background: var(--brass); }
+
+  .card-body{
+    padding:22px 22px 24px;
+  }
+  .country{
+    font-family:'JetBrains Mono', monospace;
+    color: var(--brass);
+    font-size:11px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  .city-row{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    margin-bottom:14px;
+    gap:10px;
+  }
+  .city{
+    font-family:'Archivo Black', sans-serif;
+    font-size:24px;
+    letter-spacing:-.5px;
+    line-height:1.05;
+  }
+  .fav{
+    width:32px;height:32px;
+    border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    color: var(--paper-dim);
+    font-size:14px;
+    cursor:pointer;
+    flex-shrink:0;
+    background:var(--ink);
+  }
+  .fav:hover{ border-color: var(--signal); color: var(--signal); }
+  .desc{
+    font-size:13px;
+    color: var(--paper-dim);
+    line-height:1.55;
+    margin-bottom:20px;
+  }
+  .desc b{ color: var(--paper); font-weight:600; }
+  .version-label{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10.5px;
+    color: var(--paper-dim);
+    letter-spacing:1px;
+    text-transform:uppercase;
+    margin-bottom:8px;
+  }
+  .version-select{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background: var(--ink);
+    border:1px solid var(--line);
+    padding:11px 14px;
+    margin-bottom:18px;
+  }
+  .version-ico{
+    width:22px;height:22px;
+    background: var(--signal);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;
+    font-size:10px;
+    flex-shrink:0;
+  }
+  .version-text{ flex:1; }
+  .version-text .vt-top{
+    font-size:12px; font-weight:700;
+    font-family:'JetBrains Mono', monospace;
+    letter-spacing:.5px;
+  }
+  .version-text .vt-bottom{
+    font-size:11px; color: var(--paper-dim);
+    margin-top:2px;
+  }
+  .chevron{ color: var(--paper-dim); font-size:11px; }
+
+  .play-btn{
+    width:100%;
+    background: var(--paper);
+    color: var(--ink);
+    border:none;
+    padding:14px 0;
+    font-family:'Archivo Black', sans-serif;
+    font-size:13px;
+    letter-spacing:1px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    transition: background .15s ease;
+    text-transform:uppercase;
+  }
+  .play-btn:hover{ background: var(--signal); color:#fff; }
+
+  /* =================== SETTINGS PANEL =================== */
+  .overlay{
+    position:fixed;
+    inset:0;
+    background: rgba(0,0,0,.6);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:20px;
+  }
+  .overlay.show{ display:flex; }
+  .settings-panel{
+    width:100%;
+    max-width:520px;
+    max-height:88vh;
+    overflow-y:auto;
+    background: var(--ink-2);
+    border:1px solid var(--line);
+  }
+  .settings-head{
+    background: linear-gradient(120deg, rgba(255,77,94,.18), rgba(11,12,16,0));
+    padding:22px 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border-bottom:1px solid var(--line);
+  }
+  .settings-head h3{
+    margin:0;
+    font-family:'Archivo Black', sans-serif;
+    font-size:19px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .settings-close{
+    width:32px;height:32px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background: var(--ink);
+    color: var(--paper-dim);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    font-size:14px;
+  }
+  .settings-close:hover{ color: var(--paper); border-color: var(--brass); }
+  .settings-body{ padding:26px 24px 30px; }
+  .s-section-label{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:1.5px;
+    color: var(--paper-dim);
+    text-transform:uppercase;
+    margin-bottom:12px;
+    margin-top:26px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .s-section-label:first-child{ margin-top:0; }
+  .seg-row{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap:10px;
+  }
+  .seg-row.cols-3{ grid-template-columns: repeat(3, 1fr); }
+  .seg-btn{
+    border:1px solid var(--line);
+    background: var(--ink);
+    color: var(--paper-dim);
+    padding:13px 10px;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    cursor:pointer;
+    text-align:center;
+    transition: all .15s ease;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+  }
+  .seg-btn .sub{
+    font-size:11px;
+    font-weight:500;
+    color: var(--paper-dim);
+    opacity:.8;
+  }
+  .seg-btn.active{
+    border-color: var(--signal);
+    background: rgba(255,77,94,.08);
+    color: var(--paper);
+  }
+  .seg-btn.active .sub{ color: var(--paper); }
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border:1px solid var(--line);
+    background: var(--ink);
+    padding:14px 16px;
+    margin-bottom:12px;
+  }
+  .toggle-left{
+    display:flex;
+    align-items:center;
+    gap:13px;
+  }
+  .toggle-ico{
+    width:34px;height:34px;
+    border-radius:50%;
+    background: var(--signal);
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;
+    flex-shrink:0;
+  }
+  .toggle-text .tt-top{ font-size:13.5px; font-weight:700; }
+  .toggle-text .tt-bottom{ font-size:11.5px; color: var(--paper-dim); margin-top:1px; }
+  .switch{
+    position:relative;
+    width:46px; height:26px;
+    flex-shrink:0;
+  }
+  .switch input{ display:none; }
+  .switch .track{
+    position:absolute; inset:0;
+    background: var(--line);
+    border-radius:999px;
+    transition: background .2s ease;
+    cursor:pointer;
+  }
+  .switch .track::after{
+    content:"";
+    position:absolute;
+    top:3px; left:3px;
+    width:20px; height:20px;
+    border-radius:50%;
+    background:#fff;
+    transition: transform .2s ease;
+  }
+  .switch input:checked + .track{
+    background: linear-gradient(90deg, var(--grad-a), var(--grad-b));
+  }
+  .switch input:checked + .track::after{
+    transform: translateX(20px);
+  }
+
+  [data-i18n-lang="pt"] [data-lang="en"]{ display:none; }
+  [data-i18n-lang="en"] [data-lang="pt"]{ display:none; }
+  [data-i18n-lang="fr"] [data-lang="en"]{ display:none; }
+  [data-i18n-lang="fr"] [data-lang="pt"]{ display:none; }
+  [data-i18n-lang="en"] [data-lang="fr"]{ display:none; }
+  [data-i18n-lang="pt"] [data-lang="fr"]{ display:none; }
+
+  /* =================== COMING SOON TOAST =================== */
+  .toast{
+    position:fixed;
+    bottom:28px;
+    left:50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink-2);
+    border:1px solid var(--brass);
+    color: var(--paper);
+    padding:14px 26px;
+    font-family:'Archivo Black', sans-serif;
+    font-size:13px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    z-index:200;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity .25s ease, transform .25s ease;
+    box-shadow: 0 20px 50px -15px rgba(0,0,0,.6);
+  }
+  .toast.show{
+    opacity:1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast .toast-dot{
+    width:8px;height:8px;
+    border-radius:50%;
+    background: var(--signal);
+    flex-shrink:0;
+  }
+
+  @media (max-width: 640px){
+    .hero{ padding:48px 20px 32px; }
+    .grid{ padding:32px 20px 60px; gap:28px; }
+    .topbar{ padding:14px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== MAIN APP ===================== -->
+<div class="app show" id="appScreen">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">◆</div>
+      TRANSIT
+    </div>
+    <div class="top-tabs">
+      <button class="tab active"><span data-lang="en">Maps</span><span data-lang="pt" style="display:none;">Mapas</span><span data-lang="fr" style="display:none;">Cartes</span></button>
+      <button class="tab"><span data-lang="en">Exclusives</span><span data-lang="pt" style="display:none;">Exclusivos</span><span data-lang="fr" style="display:none;">Exclusifs</span></button>
+    </div>
+    <div class="top-right">
+      <a class="icon-btn" id="discordBtn" href="https://discord.com/invite/w5D6EgSYXt" target="_blank" rel="noopener noreferrer" title="Discord" style="text-decoration:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.073.073 0 0 1 .079.009c.12.099.245.198.372.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.076.076 0 0 0-.04.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03ZM8.02 15.33c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.332-.955 2.418-2.157 2.418Zm7.975 0c-1.183 0-2.157-1.086-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.332-.946 2.418-2.157 2.418Z"/>
+        </svg>
+      </a>
+      <div class="icon-btn" id="topLangBtn">🌐</div>
+      <div class="icon-btn" id="openSettings">⚙</div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div>
+      <div class="hero-eyebrow">
+        <span data-lang="en">Route catalogue · Vol. 01</span>
+        <span data-lang="pt" style="display:none;">Catálogo de rotas · Vol. 01</span>
+        <span data-lang="fr" style="display:none;">Catalogue de lignes · Vol. 01</span>
+      </div>
+      <h2 data-lang="en">HOME</h2>
+      <h2 data-lang="pt" style="display:none;">HOME</h2>
+      <h2 data-lang="fr" style="display:none;">ACCUEIL</h2>
+      <div class="count">
+        <span data-lang="en">11 / 11 MAPS BOARDED</span>
+        <span data-lang="pt" style="display:none;">11 / 11 MAPAS DISPONÍVEIS</span>
+        <span data-lang="fr" style="display:none;">11 / 11 CARTES DISPONIBLES</span>
+      </div>
+    </div>
+    <div class="search-box">
+      ⌕
+      <input type="text" data-lang="en" placeholder="SEARCH MAP...">
+      <input type="text" data-lang="pt" placeholder="BUSCAR MAPA..." style="display:none;">
+      <input type="text" data-lang="fr" placeholder="RECHERCHER..." style="display:none;">
+    </div>
+  </div>
+
+  <div class="grid" id="cardsGrid"></div>
+</div>
+
+<!-- ===================== SETTINGS OVERLAY ===================== -->
+<div class="overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <div class="settings-head">
+      <h3>⚙ <span data-lang="en">Settings</span><span data-lang="pt" style="display:none;">Configurações</span><span data-lang="fr" style="display:none;">Paramètres</span></h3>
+      <div class="settings-close" id="closeSettings">✕</div>
+    </div>
+    <div class="settings-body">
+
+      <div class="s-section-label" data-lang="en">Theme</div>
+      <div class="s-section-label" data-lang="pt" style="display:none;">Tema</div>
+      <div class="s-section-label" data-lang="fr" style="display:none;">Thème</div>
+      <div class="seg-row" id="themeRow">
+        <button class="seg-btn active" data-val="dark">🌙 <span data-lang="en">Dark</span><span data-lang="pt" style="display:none;">Escuro</span><span data-lang="fr" style="display:none;">Sombre</span></button>
+        <button class="seg-btn" data-val="light">☀ <span data-lang="en">Light</span><span data-lang="pt" style="display:none;">Claro</span><span data-lang="fr" style="display:none;">Clair</span></button>
+      </div>
+
+      <div class="toggle-row" style="margin-top:26px;">
+        <div class="toggle-left">
+          <div class="toggle-ico">📱</div>
+          <div class="toggle-text">
+            <div class="tt-top">Mobile New Touch</div>
+            <div class="tt-bottom">
+              <span data-lang="en">New touch controls</span>
+              <span data-lang="pt" style="display:none;">Novos controles de toque</span>
+              <span data-lang="fr" style="display:none;">Nouveaux contrôles tactiles</span>
+            </div>
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" checked>
+          <span class="track"></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-left">
+          <div class="toggle-ico">🔊</div>
+          <div class="toggle-text">
+            <div class="tt-top"><span data-lang="en">Sound</span><span data-lang="pt" style="display:none;">Som</span><span data-lang="fr" style="display:none;">Son</span></div>
+            <div class="tt-bottom">
+              <span data-lang="en">Effects and music</span>
+              <span data-lang="pt" style="display:none;">Efeitos e música</span>
+              <span data-lang="fr" style="display:none;">Effets et musique</span>
+            </div>
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" checked>
+          <span class="track"></span>
+        </label>
+      </div>
+
+      <div class="s-section-label">⌨ <span data-lang="en">PC controls</span><span data-lang="pt" style="display:none;">Controles PC</span><span data-lang="fr" style="display:none;">Contrôles PC</span></div>
+      <div class="seg-row cols-3" id="controlsRow">
+        <button class="seg-btn active" data-val="wasd">WASD</button>
+        <button class="seg-btn" data-val="zqsd">ZQSD</button>
+        <button class="seg-btn" data-val="arrows"><span data-lang="en">Arrows</span><span data-lang="pt" style="display:none;">Setas</span><span data-lang="fr" style="display:none;">Flèches</span></button>
+      </div>
+
+      <div class="s-section-label">🌐 <span data-lang="en">Language</span><span data-lang="pt" style="display:none;">Idioma</span><span data-lang="fr" style="display:none;">Langue</span></div>
+      <div class="seg-row cols-3" id="appLangRow">
+        <button class="seg-btn" data-val="fr">FR<span class="sub">FR</span></button>
+        <button class="seg-btn active" data-val="pt">BR<span class="sub">PT</span></button>
+        <button class="seg-btn" data-val="en">GB<span class="sub">EN</span></button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="comingSoonToast">
+  <span class="toast-dot"></span>
+  <span data-lang="en">COMING SOON</span>
+  <span data-lang="pt" style="display:none;">EM BREVE</span>
+  <span data-lang="fr" style="display:none;">BIENTÔT DISPONIBLE</span>
+</div>
+
+<script>
+  /* ---------------- Language handling ---------------- */
+  function setLang(lang){
+    document.documentElement.setAttribute('data-i18n-lang', lang);
+    document.querySelectorAll('#appLangRow .seg-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.val === lang);
+    });
+    document.querySelectorAll('[data-lang]').forEach(el => {
+      el.style.display = (el.getAttribute('data-lang') === lang) ? '' : 'none';
+    });
+  }
+  document.getElementById('topLangBtn').addEventListener('click', () => {
+    const order = ['en','pt','fr'];
+    const current = document.documentElement.getAttribute('data-i18n-lang') || 'en';
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    setLang(next);
+  });
+  document.querySelectorAll('#appLangRow .seg-btn').forEach(b => {
+    b.addEventListener('click', () => setLang(b.dataset.val));
+  });
+  setLang('pt');
+
+  /* ---------------- Settings panel ---------------- */
+  const overlay = document.getElementById('settingsOverlay');
+  document.getElementById('openSettings').addEventListener('click', () => overlay.classList.add('show'));
+  document.getElementById('closeSettings').addEventListener('click', () => overlay.classList.remove('show'));
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('show'); });
+
+  document.querySelectorAll('#themeRow .seg-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#themeRow .seg-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+  document.querySelectorAll('#controlsRow .seg-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#controlsRow .seg-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  /* ---------------- Card data (name-only tiles, no photos) ---------------- */
+  const cards = [
+    { country_en:"Thailand", country_pt:"Tailândia", country_fr:"Thaïlande", city:"Bangkok", code:"BKK·01",
+      desc_en:"Neon markets. <b>Normal map version.</b>", desc_pt:"Mercados neon. <b>Versão normal do mapa.</b>", desc_fr:"Marchés néon. <b>Version normale de la carte.</b>",
+      badges:["new","orig"], bg:"linear-gradient(150deg, #2a1830, #120912)" },
+    { country_en:"Spain", country_pt:"Espanha", country_fr:"Espagne", city:"Barcelona", code:"BCN·02",
+      desc_en:"Mediterranean shoreline. <b>Normal map version.</b>", desc_pt:"Orla mediterrânea. <b>Versão normal do mapa.</b>", desc_fr:"Littoral méditerranéen. <b>Version normale de la carte.</b>",
+      badges:["orig"], bg:"linear-gradient(150deg, #1a2a38, #0a1218)" },
+    { country_en:"China", country_pt:"China", country_fr:"Chine", city:"Beijing", code:"PEK·03",
+      desc_en:"Imperial route. <b>Normal map version.</b>", desc_pt:"Rota imperial. <b>Versão normal do mapa.</b>", desc_fr:"Route impériale. <b>Version normale de la carte.</b>",
+      badges:["orig"], bg:"linear-gradient(150deg, #301418, #120808)" },
+    { country_en:"Brazil", country_pt:"Brasil", country_fr:"Brésil", city:"Rio de Janeiro", code:"RIO·04",
+      desc_en:"Coastal favela run. <b>Normal map version.</b>", desc_pt:"Corrida costeira na favela. <b>Versão normal do mapa.</b>", desc_fr:"Course côtière dans la favela. <b>Version normale de la carte.</b>",
+      badges:["orig"], bg:"linear-gradient(150deg, #1a3028, #081410)" },
+    { country_en:"India", country_pt:"Índia", country_fr:"Inde", city:"Mumbai", code:"BOM·05",
+      desc_en:"Monsoon rails. <b>Normal map version.</b>", desc_pt:"Trilhos da monção. <b>Versão normal do mapa.</b>", desc_fr:"Rails sous la mousson. <b>Version normale de la carte.</b>",
+      badges:["orig"], bg:"linear-gradient(150deg, #302418, #120c08)" },
+    { country_en:"Egypt", country_pt:"Egito", country_fr:"Égypte", city:"Cairo", code:"CAI·06",
+      desc_en:"Desert crossing. <b>Normal map version.</b>", desc_pt:"Travessia no deserto. <b>Versão normal do mapa.</b>", desc_fr:"Traversée du désert. <b>Version normale de la carte.</b>",
+      badges:["new","orig"], bg:"linear-gradient(150deg, #302a18, #14100a)" },
+    { country_en:"South Korea", country_pt:"Coreia do Sul", country_fr:"Corée du Sud", city:"Seoul", code:"SEL·07",
+      desc_en:"Rooftop skyline run. <b>Normal map version.</b>", desc_pt:"Corrida nos telhados da cidade. <b>Versão normal do mapa.</b>", desc_fr:"Course sur les toits de la ville. <b>Version normale de la carte.</b>",
+      badges:["new","orig"], bg:"linear-gradient(150deg, #18222e, #080c12)" },
+    { country_en:"Romania", country_pt:"Romênia", country_fr:"Roumanie", city:"Transylvania", code:"TRN·08",
+      desc_en:"Misty forest castle line. <b>Normal map version.</b>", desc_pt:"Linha do castelo na floresta nebulosa. <b>Versão normal do mapa.</b>", desc_fr:"Ligne du château dans la forêt brumeuse. <b>Version normale de la carte.</b>",
+      badges:["new","orig"], bg:"linear-gradient(150deg, #1c1428, #0a0610)" },
+    { country_en:"Switzerland", country_pt:"Suíça", country_fr:"Suisse", city:"Zurich", code:"ZRH·09",
+      desc_en:"Alpine lakeside tracks. <b>Normal map version.</b>", desc_pt:"Trilhos à beira do lago alpino. <b>Versão normal do mapa.</b>", desc_fr:"Voies au bord du lac alpin. <b>Version normale de la carte.</b>",
+      badges:["orig"], bg:"linear-gradient(150deg, #16242a, #060e10)" },
+    { country_en:"Germany", country_pt:"Alemanha", country_fr:"Allemagne", city:"Berlin", code:"BER·10",
+      desc_en:"Underground street art line. <b>Normal map version.</b>", desc_pt:"Linha de arte urbana subterrânea. <b>Versão normal do mapa.</b>", desc_fr:"Ligne d'art urbain souterraine. <b>Version normale de la carte.</b>",
+      badges:["orig"], bg:"linear-gradient(150deg, #1e1e26, #0a0a0e)" },
+    { country_en:"France", country_pt:"França", country_fr:"France", city:"Paris", code:"PAR·11",
+      desc_en:"Boulevard express route. <b>Normal map version.</b>", desc_pt:"Rota expressa pelo boulevard. <b>Versão normal do mapa.</b>", desc_fr:"Itinéraire express du boulevard. <b>Version normale de la carte.</b>",
+      badges:["new","orig"], bg:"linear-gradient(150deg, #281e24, #100a0e)" }
+  ];
+
+  const grid = document.getElementById('cardsGrid');
+  cards.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="name-tile" style="--tile-bg:${c.bg}">
+        <div class="badge-row">
+          ${c.badges.includes('new') ? `<div class="badge new"><span data-lang="en">NEW</span><span data-lang="pt" style="display:none;">NOVO</span><span data-lang="fr" style="display:none;">NOUVEAU</span></div>` : ''}
+          ${c.badges.includes('orig') ? `<div class="badge orig">ORIGINAL</div>` : ''}
+        </div>
+        <div class="tile-city">${c.city}</div>
+        <div class="tile-code">${c.code}</div>
+      </div>
+      <div class="card-body">
+        <div class="country">
+          <span data-lang="en">${c.country_en}</span>
+          <span data-lang="pt" style="display:none;">${c.country_pt}</span>
+          <span data-lang="fr" style="display:none;">${c.country_fr}</span>
+        </div>
+        <div class="city-row">
+          <div class="city">${c.city}</div>
+          <div class="fav">♡</div>
+        </div>
+        <div class="desc">
+          <span data-lang="en">${c.desc_en}</span>
+          <span data-lang="pt" style="display:none;">${c.desc_pt}</span>
+          <span data-lang="fr" style="display:none;">${c.desc_fr}</span>
+        </div>
+        <div class="version-label">
+          <span data-lang="en">Version type</span>
+          <span data-lang="pt" style="display:none;">Tipo da versão</span>
+          <span data-lang="fr" style="display:none;">Type de version</span>
+        </div>
+        <div class="version-select">
+          <div class="version-ico">◆</div>
+          <div class="version-text">
+            <div class="vt-top">ORIGINAL</div>
+            <div class="vt-bottom">
+              <span data-lang="en">Normal map version</span>
+              <span data-lang="pt" style="display:none;">Versão normal do mapa</span>
+              <span data-lang="fr" style="display:none;">Version normale de la carte</span>
+            </div>
+          </div>
+          <div class="chevron">▾</div>
+        </div>
+        <button class="play-btn">
+          ▷ <span data-lang="en">PLAY</span><span data-lang="pt" style="display:none;">JOGAR</span><span data-lang="fr" style="display:none;">JOUER</span>
+        </button>
+      </div>
+    `;
+    grid.appendChild(div);
+  });
+
+  setLang(document.documentElement.getAttribute('data-i18n-lang') || 'pt');
+
+  /* ---------------- Coming soon toast ---------------- */
+  let toastTimer = null;
+  function showComingSoon(){
+    const toast = document.getElementById('comingSoonToast');
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+  }
+  grid.addEventListener('click', e => {
+    const btn = e.target.closest('.play-btn');
+    if (btn) showComingSoon();
+  });
+</script>
+
+</body>
+</html>
